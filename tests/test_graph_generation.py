@@ -132,6 +132,79 @@ class MultiLineInherit(
         assert "Base2" in multi.super
 
 
+class TestAsyncParsing:
+    """Tests for `async` constructs parsing.
+
+    Regression tests: the `async` branch of ``create_objects_array`` used to
+    (a) assume the token after ``async`` was always ``def`` — so ``async for``
+    / ``async with`` were parsed as function definitions — and (b) push
+    ``None`` on the stack for a module-level ``async def``, which crashed on
+    the next nested ``def`` / ``async`` token.
+    """
+
+    def test_nested_async_def_inside_module_level_async_def(self):
+        """A nested async function is attached to its module-level parent."""
+        source = """async def outer():
+    async def inner():
+        pass
+    return inner
+"""
+        result = create_objects_array("test.py", source)
+        outer = next(o for o in result if getattr(o, "name", None) == "outer")
+        assert "inner" in outer.children
+
+    def test_nested_def_inside_module_level_async_def(self):
+        """A nested sync function is attached to its module-level async parent."""
+        source = """async def outer():
+    def inner():
+        pass
+    return inner
+"""
+        result = create_objects_array("test.py", source)
+        outer = next(o for o in result if getattr(o, "name", None) == "outer")
+        assert "inner" in outer.children
+
+    def test_async_for_comprehension_is_not_a_function(self):
+        source = """async def collect(items):
+    return [x async for x in items]
+"""
+        result = create_objects_array("test.py", source)
+        collect = next(o for o in result if getattr(o, "name", None) == "collect")
+        assert collect.children == {}
+
+    def test_async_for_statement_is_not_a_function(self):
+        source = """async def drain(items):
+    async for item in items:
+        print(item)
+"""
+        result = create_objects_array("test.py", source)
+        drain = next(o for o in result if getattr(o, "name", None) == "drain")
+        assert drain.children == {}
+
+    def test_async_with_is_not_a_function(self):
+        source = """async def run(lock):
+    async with lock:
+        return 1
+"""
+        result = create_objects_array("test.py", source)
+        run = next(o for o in result if getattr(o, "name", None) == "run")
+        assert run.children == {}
+
+    def test_module_level_async_def_then_top_level_def(self):
+        """A module-level async def does not break the following top-level def."""
+        source = """async def first():
+    return 1
+
+
+def second():
+    return 2
+"""
+        result = create_objects_array("test.py", source)
+        names = [getattr(o, "name", None) for o in result]
+        assert "first" in names
+        assert "second" in names
+
+
 class TestCodeGraphConnections:
     """Tests for CodeGraph connection detection."""
 

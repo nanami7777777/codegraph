@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `AttributeError: 'NoneType' object has no attribute 'file'` when a module-level `async def` contains a nested function definition, an `async for` statement/comprehension, or an `async with` statement.
+  The `async` branch of `create_objects_array` assumed the token following `async` was always `def` (so `async for` / `async with` were parsed as function definitions) and pushed `None` on the scope stack for a module-level `async def`, which blew up on the next nested `def` / `async` token.
+
 ## [1.2.0] - 2026-01-18
 
 ### Added
