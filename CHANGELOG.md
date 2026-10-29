@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AttributeError: 'NoneType' object has no attribute 'file'` when a module-level `async def` contains a nested function definition, an `async for` statement/comprehension, or an `async with` statement.
   The `async` branch of `create_objects_array` assumed the token following `async` was always `def` (so `async for` / `async with` were parsed as function definitions) and pushed `None` on the scope stack for a module-level `async def`, which blew up on the next nested `def` / `async` token.
+- `TypeError: '<=' not supported between instances of 'int' and 'NoneType'` in `usage_graph()` when a module contains an entity that never received an end line. Scopes closed by a sibling `def` / `class` (one-line bodies such as `def f(self) -> None: ...` have no DEDENT) or by EOF never reached the DEDENT handler, so their `endno` stayed `None`. `create_objects_array` now finalizes `endno` whenever it pops a scope and closes everything still open at EOF.
 
 ## [1.2.0] - 2026-01-18
 

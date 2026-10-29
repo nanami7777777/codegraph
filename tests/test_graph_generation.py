@@ -205,6 +205,57 @@ def second():
         assert "second" in names
 
 
+class TestEntityEndLines:
+    """Tests for `endno` (entity end line) being always set.
+
+    Regression tests: scopes closed by a sibling `def` / `class` (or by EOF)
+    never reach the DEDENT handler, so their `endno` stayed `None` and
+    `CodeGraph.usage_graph()` later raised
+    ``TypeError: '<=' not supported between instances of 'int' and 'NoneType'``.
+    """
+
+    def test_one_line_function_has_end_line(self):
+        """A `def ...: ...` with no indented body still gets an end line."""
+        source = """def f(self) -> None: ...
+
+
+def g():
+    return 1
+"""
+        result = create_objects_array("test.py", source)
+        f = next(o for o in result if getattr(o, "name", None) == "f")
+        assert f.endno is not None
+
+    def test_last_entity_in_module_has_end_line(self):
+        """The last entity of a module is closed at EOF."""
+        source = """def a():
+    return 1
+"""
+        result = create_objects_array("test.py", source)
+        a = next(o for o in result if getattr(o, "name", None) == "a")
+        assert a.endno is not None
+
+    def test_scope_closed_by_sibling_def_has_end_line(self):
+        source = """class A:
+    def m(self): ...
+
+
+def b():
+    return 1
+"""
+        result = create_objects_array("test.py", source)
+        cls = next(o for o in result if getattr(o, "name", None) == "A")
+        assert cls.children["m"].endno is not None
+
+    def test_module_level_async_function_has_end_line(self):
+        source = """async def a():
+    return 1
+"""
+        result = create_objects_array("test.py", source)
+        a = next(o for o in result if getattr(o, "name", None) == "a")
+        assert a.endno is not None
+
+
 class TestCodeGraphConnections:
     """Tests for CodeGraph connection detection."""
 
