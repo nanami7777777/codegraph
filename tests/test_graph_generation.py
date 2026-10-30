@@ -256,6 +256,44 @@ def b():
         assert a.endno is not None
 
 
+class TestUsageGraphIdempotency:
+    """`usage_graph()` must be safe to call more than once.
+
+    Regression test: import extraction used to `pop()` the `Import` object
+    off the parsed module, so a second call silently lost every
+    import-derived edge. Since the CLI builds the graph (for the
+    visualisation / CSV) before searching it, `--file-path` / `--distance`
+    always reported "no dependencies".
+    """
+
+    def test_second_call_matches_the_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / "mod_a.py").write_text(
+                "from mod_b import helper\n\n\ndef use():\n    return helper()\n"
+            )
+            (root / "mod_b.py").write_text("def helper():\n    return 1\n")
+            code_graph = CodeGraph(Namespace(paths=[tmp]))
+            first = code_graph.usage_graph()
+            second = code_graph.usage_graph()
+
+        assert first == second
+
+    def test_dependencies_found_after_usage_graph_was_called(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            mod_a = root / "mod_a.py"
+            mod_a.write_text(
+                "from mod_b import helper\n\n\ndef use():\n    return helper()\n"
+            )
+            (root / "mod_b.py").write_text("def helper():\n    return 1\n")
+            code_graph = CodeGraph(Namespace(paths=[tmp]))
+            code_graph.usage_graph()
+            dependencies = code_graph.get_dependencies(str(mod_a), 1)
+
+        assert "mod_b.py" in dependencies[1]
+
+
 class TestCodeGraphConnections:
     """Tests for CodeGraph connection detection."""
 
